@@ -83,6 +83,23 @@ it("allows only explicitly listed deployment origins", () => {
   );
   expect(() => assertJsonMutation(rejected)).toThrow("origin");
 });
+it("allows the exact Vercel deployment and branch system origins", () => {
+  const deployment = "sage-nyc-prompt-chains-commit.vercel.app";
+  const branch = "sage-nyc-prompt-chains-git-main.vercel.app";
+  vi.stubEnv("VERCEL_URL", deployment);
+  vi.stubEnv("VERCEL_BRANCH_URL", branch);
+  for (const host of [deployment, branch]) {
+    const origin = `https://${host}`;
+    const allowed = request({ origin }, "POST", `${origin}/api/future`);
+    expect(() => assertJsonMutation(allowed)).not.toThrow();
+  }
+  const rejected = request(
+    { origin: "https://other-project.vercel.app" },
+    "POST",
+    "https://other-project.vercel.app/api/future",
+  );
+  expect(() => assertJsonMutation(rejected)).toThrow("origin");
+});
 it("requires matching nonempty Google double-submit CSRF tokens", () => {
   expect(() => verifyGoogleCsrf("same", "same")).not.toThrow();
   for (const [body, cookie] of [
@@ -128,6 +145,10 @@ it("rejects malformed or duplicate allowlist entries", () => {
   vi.stubEnv("APP_ALLOWED_ORIGINS", "https://deploy.example/path");
   expect(() => authConfig()).toThrow("invalid");
   vi.stubEnv("APP_ALLOWED_ORIGINS", `${origin},${origin}`);
+  expect(() => authConfig()).toThrow("invalid");
+});
+it("rejects malformed Vercel system origins", () => {
+  vi.stubEnv("VERCEL_URL", "https://deployment.example/path");
   expect(() => authConfig()).toThrow("invalid");
 });
 it("uses an isolated, HttpOnly, host-only session cookie with production Secure", () => {

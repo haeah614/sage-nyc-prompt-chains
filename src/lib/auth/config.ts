@@ -3,6 +3,21 @@ import { AuthError } from "./errors";
 
 export const SESSION_COOKIE = "sage-prompt-chains-auth";
 export const NONCE_COOKIE = "sage-prompt-chains-login-nonce";
+function deploymentOrigin(value: string | undefined) {
+  if (!value) return [];
+  const candidate = value.startsWith("http") ? value : `https://${value}`;
+  return [candidate];
+}
+function configuredOrigins(origin: string) {
+  return [
+    origin,
+    ...(process.env.APP_ALLOWED_ORIGINS ?? "").split(","),
+    ...deploymentOrigin(process.env.VERCEL_URL),
+    ...deploymentOrigin(process.env.VERCEL_BRANCH_URL),
+  ]
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
 export function cookieOptions() {
   return {
     path: "/",
@@ -28,12 +43,7 @@ export function authConfig() {
     throw new AuthError(503, "Authentication is not configured.");
   }
   try {
-    const origins = [
-      origin,
-      ...(process.env.APP_ALLOWED_ORIGINS ?? "").split(","),
-    ]
-      .map((value) => value.trim())
-      .filter(Boolean);
+    const origins = configuredOrigins(origin);
     if (new Set(origins).size !== origins.length || origins.length > 10)
       throw new Error();
     for (const candidate of origins) {
@@ -67,8 +77,6 @@ export function authConfig() {
     serviceKey,
     googleClientId,
     origin,
-    origins: [origin, ...(process.env.APP_ALLOWED_ORIGINS ?? "").split(",")]
-      .map((value) => value.trim())
-      .filter(Boolean),
+    origins: configuredOrigins(origin),
   };
 }

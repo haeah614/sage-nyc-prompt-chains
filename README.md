@@ -53,6 +53,13 @@ Do not connect this application to production until its configuration and databa
 | `SUPABASE_SERVICE_ROLE_KEY`            | Server-only key, used exclusively for the narrow Superadmin flag read. Never prefix it with `NEXT_PUBLIC_`.        |
 | `GEMINI_API_KEY`                       | Server-only Gemini API key used by the execution route; never expose it with `NEXT_PUBLIC_`.                       |
 
+On Vercel, the server also recognizes the exact system-provided `VERCEL_URL`
+and `VERCEL_BRANCH_URL` values for the current deployment and branch. Enable
+Vercel system environment variables for the project. These values are used as
+exact origins only; arbitrary Vercel domains are never accepted. Google OAuth
+still requires the current URL and `/auth/callback` to be registered in the
+OAuth client because Google does not support wildcard redirect URIs.
+
 Setup checklist for the approved test environment:
 
 1. Configure a Google Web OAuth client. Register the exact app origin under authorized JavaScript origins and `<APP_ORIGIN>/auth/callback` as the authorized redirect URI for the GIS redirect flow. Configure the consent screen and test users as applicable.
