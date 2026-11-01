@@ -24,10 +24,10 @@ declare global {
 }
 export function GoogleLogin({
   clientId,
-  origin,
+  origins,
 }: {
   clientId: string;
-  origin: string;
+  origins: string[];
 }) {
   const container = useRef<HTMLDivElement>(null);
   const initializing = useRef(false);
@@ -36,11 +36,8 @@ export function GoogleLogin({
     if (initializing.current) return;
     initializing.current = true;
     try {
-      if (
-        window.location.origin !== origin ||
-        !window.google ||
-        !container.current
-      )
+      const origin = window.location.origin;
+      if (!origins.includes(origin) || !window.google || !container.current)
         throw new Error();
       const response = await fetch("/auth/prepare", {
         method: "POST",

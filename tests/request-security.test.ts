@@ -66,6 +66,23 @@ it("allows Google's cross-site callback only at the configured destination", () 
     ),
   ).toThrow();
 });
+it("allows only explicitly listed deployment origins", () => {
+  const deployment = "https://sage-nyc-prompt-chains-commit.vercel.app";
+  vi.stubEnv("APP_ALLOWED_ORIGINS", deployment);
+  const allowed = request(
+    { origin: deployment },
+    "POST",
+    deployment + "/api/future",
+  );
+  expect(() => assertJsonMutation(allowed)).not.toThrow();
+  expect(trustedOrigin(allowed)).toBe(deployment);
+  const rejected = request(
+    { origin: "https://untrusted.vercel.app" },
+    "POST",
+    "https://untrusted.vercel.app/api/future",
+  );
+  expect(() => assertJsonMutation(rejected)).toThrow("origin");
+});
 it("requires matching nonempty Google double-submit CSRF tokens", () => {
   expect(() => verifyGoogleCsrf("same", "same")).not.toThrow();
   for (const [body, cookie] of [
@@ -104,6 +121,13 @@ it("disables authentication by default and rejects malformed origins", () => {
   expect(() => authConfig()).toThrow("not configured");
   vi.stubEnv("AUTH_ENABLED", "true");
   vi.stubEnv("APP_ORIGIN", origin + "/path");
+  expect(() => authConfig()).toThrow("invalid");
+});
+it("rejects malformed or duplicate allowlist entries", () => {
+  vi.stubEnv("APP_ORIGIN", origin);
+  vi.stubEnv("APP_ALLOWED_ORIGINS", "https://deploy.example/path");
+  expect(() => authConfig()).toThrow("invalid");
+  vi.stubEnv("APP_ALLOWED_ORIGINS", `${origin},${origin}`);
   expect(() => authConfig()).toThrow("invalid");
 });
 it("uses an isolated, HttpOnly, host-only session cookie with production Secure", () => {

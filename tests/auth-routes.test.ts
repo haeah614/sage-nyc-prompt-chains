@@ -116,6 +116,18 @@ it("exchanges the Google token with the raw nonce then authorizes its verified i
   expect(mocks.lookup).toHaveBeenCalledExactlyOnceWith("verified-user");
   expect(mocks.jar.get(NONCE_COOKIE)).toBe("");
 });
+it("accepts a Google callback on an explicitly allowed deployment origin", async () => {
+  const deployment = "https://sage-nyc-prompt-chains-commit.vercel.app";
+  vi.stubEnv("APP_ALLOWED_ORIGINS", deployment);
+  const response = await callback(
+    callbackRequest(
+      "credential=synthetic-token&g_csrf_token=csrf",
+      deployment + "/auth/callback",
+    ),
+  );
+  expect(response.status).toBe(303);
+  expect(response.headers.get("location")).toBe(deployment + "/chains");
+});
 it("never exchanges tokens with a missing/mismatched CSRF token", async () => {
   await callback(
     callbackRequest("credential=synthetic-token&g_csrf_token=wrong"),

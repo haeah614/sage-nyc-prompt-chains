@@ -28,19 +28,29 @@ export function authConfig() {
     throw new AuthError(503, "Authentication is not configured.");
   }
   try {
-    const parsed = new URL(origin);
-    if (
-      parsed.origin !== origin ||
-      parsed.username ||
-      parsed.password ||
-      (parsed.protocol !== "https:" &&
-        !(
-          process.env.NODE_ENV !== "production" &&
-          parsed.protocol === "http:" &&
-          ["localhost", "127.0.0.1"].includes(parsed.hostname)
-        ))
-    )
+    const origins = [
+      origin,
+      ...(process.env.APP_ALLOWED_ORIGINS ?? "").split(","),
+    ]
+      .map((value) => value.trim())
+      .filter(Boolean);
+    if (new Set(origins).size !== origins.length || origins.length > 10)
       throw new Error();
+    for (const candidate of origins) {
+      const parsed = new URL(candidate);
+      if (
+        parsed.origin !== candidate ||
+        parsed.username ||
+        parsed.password ||
+        (parsed.protocol !== "https:" &&
+          !(
+            process.env.NODE_ENV !== "production" &&
+            parsed.protocol === "http:" &&
+            ["localhost", "127.0.0.1"].includes(parsed.hostname)
+          ))
+      )
+        throw new Error();
+    }
     const supabase = new URL(url);
     if (
       supabase.protocol !== "https:" ||
@@ -51,5 +61,14 @@ export function authConfig() {
   } catch {
     throw new AuthError(503, "Authentication configuration is invalid.");
   }
-  return { url, key, serviceKey, googleClientId, origin };
+  return {
+    url,
+    key,
+    serviceKey,
+    googleClientId,
+    origin,
+    origins: [origin, ...(process.env.APP_ALLOWED_ORIGINS ?? "").split(",")]
+      .map((value) => value.trim())
+      .filter(Boolean),
+  };
 }

@@ -46,6 +46,7 @@ Do not connect this application to production until its configuration and databa
 | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | `AUTH_ENABLED`                         | Explicit opt-in; only the literal `true` enables auth clients. Leave unset until reviewed.                         |
 | `APP_ORIGIN`                           | One exact trusted origin, including port when applicable; no path or trailing slash. HTTPS required in production. |
+| `APP_ALLOWED_ORIGINS`                  | Optional comma-separated exact deployment origins; no wildcards.                                                   |
 | `NEXT_PUBLIC_GOOGLE_CLIENT_ID`         | Google Web OAuth client ID; public, never a client secret.                                                         |
 | `NEXT_PUBLIC_SUPABASE_URL`             | Approved Supabase project's HTTPS URL.                                                                             |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Public key for session authentication.                                                                             |

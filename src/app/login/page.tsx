@@ -25,7 +25,10 @@ export default async function Login({
         </p>
       )}
       {config ? (
-        <GoogleLogin clientId={config.googleClientId} origin={config.origin} />
+        <GoogleLogin
+          clientId={config.googleClientId}
+          origins={config.origins}
+        />
       ) : (
         <p className="auth-notice" role="status">
           Authentication is not configured. An administrator must enable the

@@ -4,10 +4,11 @@ import { authConfig } from "./config";
 import { AuthError } from "./errors";
 
 export function trustedOrigin(request: Request, requireSameOrigin = true) {
-  const { origin } = authConfig();
+  const { origins } = authConfig();
+  const requestOrigin = new URL(request.url).origin;
   if (
-    new URL(request.url).origin !== origin ||
-    (requireSameOrigin && request.headers.get("origin") !== origin)
+    !origins.includes(requestOrigin) ||
+    (requireSameOrigin && request.headers.get("origin") !== requestOrigin)
   ) {
     throw new AuthError(403, "Request origin is not allowed.");
   }
@@ -16,7 +17,7 @@ export function trustedOrigin(request: Request, requireSameOrigin = true) {
     if (site && site !== "same-origin")
       throw new AuthError(403, "Cross-site requests are not allowed.");
   }
-  return origin;
+  return requestOrigin;
 }
 export function assertJsonMutation(request: Request) {
   trustedOrigin(request);
