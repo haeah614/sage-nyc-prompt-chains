@@ -20,7 +20,7 @@ type ChainDetail = {
     generation_config: Record<string, unknown>;
   })[];
 };
-const PREFERRED_GEMINI_MODEL = "gemini-3.5-flash-lite";
+const PREFERRED_GEMINI_MODEL = "gemini-flash-lite-latest";
 type ExecutionTiming = {
   totalMs: number;
   authMs: number;
