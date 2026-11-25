@@ -57,9 +57,15 @@ export async function generateWithGemini(input: {
     );
   }
   if (!response.ok) {
+    const providerBody = (await response.json().catch(() => null)) as
+      | { error?: { code?: number; status?: string; message?: string } }
+      | null;
     console.error("Gemini provider rejected the request", {
       modelKey: input.modelKey,
       status: response.status,
+      providerCode: providerBody?.error?.code,
+      providerStatus: providerBody?.error?.status,
+      providerMessage: providerBody?.error?.message?.slice(0, 240),
     });
     const message =
       response.status === 401 || response.status === 403
