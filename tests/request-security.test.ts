@@ -114,6 +114,18 @@ it("requires matching nonempty Google double-submit CSRF tokens", () => {
     );
   }
 });
+it("accepts overlapping explicit and Vercel origins without expanding trust", () => {
+  vi.stubEnv("VERCEL_URL", new URL(origin).host);
+  vi.stubEnv("VERCEL_BRANCH_URL", new URL(origin).host);
+  expect(authConfig().origins).toEqual([origin]);
+  const deployment = "https://deployment.example.test";
+  vi.stubEnv("APP_ALLOWED_ORIGINS", deployment);
+  vi.stubEnv("VERCEL_URL", new URL(deployment).host);
+  expect(authConfig().origins).toEqual([origin, deployment]);
+  expect(() =>
+    trustedOrigin(request({}, "POST", "https://other.vercel.app/api/future")),
+  ).toThrow("origin");
+});
 it("limits actual callback bytes even without Content-Length", async () => {
   const make = (body: string) =>
     new Request(origin, {

@@ -32,7 +32,24 @@ export async function POST(request: Request) {
       token: credential,
       nonce,
     });
-    if (error) throw new AuthError(401, "Google sign-in failed.");
+    if (error) {
+      const unavailable =
+        error.status === 0 ||
+        error.status === undefined ||
+        error.status === 429 ||
+        error.status >= 500;
+      // Never log the credential, nonce, session, or raw provider message.
+      console.error("[auth] Google ID-token exchange failed", {
+        status: error.status,
+        unavailable,
+      });
+      throw new AuthError(
+        unavailable ? 503 : 401,
+        unavailable
+          ? "Authentication is temporarily unavailable."
+          : "Google sign-in failed.",
+      );
+    }
     await requireSuperadmin(client);
     return NextResponse.redirect(new URL("/chains", origin), {
       status: 303,

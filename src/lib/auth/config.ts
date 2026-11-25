@@ -9,14 +9,23 @@ function deploymentOrigin(value: string | undefined) {
   return [candidate];
 }
 function configuredOrigins(origin: string) {
-  return [
+  const explicit = [
     origin,
     ...(process.env.APP_ALLOWED_ORIGINS ?? "").split(","),
-    ...deploymentOrigin(process.env.VERCEL_URL),
-    ...deploymentOrigin(process.env.VERCEL_BRANCH_URL),
   ]
     .map((value) => value.trim())
     .filter(Boolean);
+  // System origins may legitimately overlap explicit configuration or each other.
+  // Keep explicit duplicates invalid, while adding each system origin only once.
+  const origins = [...explicit];
+  for (const value of [
+    ...deploymentOrigin(process.env.VERCEL_URL),
+    ...deploymentOrigin(process.env.VERCEL_BRANCH_URL),
+  ]) {
+    const candidate = value.trim();
+    if (!origins.includes(candidate)) origins.push(candidate);
+  }
+  return origins;
 }
 export function cookieOptions() {
   return {

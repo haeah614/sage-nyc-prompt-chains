@@ -151,12 +151,27 @@ it("denies non-Superadmins after valid Google sign-in", async () => {
 });
 it("rejects provider exchange errors before reading profiles", async () => {
   mocks.signIn.mockResolvedValue({
-    error: { message: "sensitive provider error" },
+    error: { status: 400, message: "sensitive provider error" },
   });
   const response = await callback(callbackRequest());
   expect(response.headers.get("location")).toBe(origin + "/login?error=signin");
   expect(mocks.lookup).not.toHaveBeenCalled();
 });
+it.each([0, undefined, 429, 500, 503])(
+  "reports provider unavailability (%s) without blaming the Google credential",
+  async (status) => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    mocks.signIn.mockResolvedValue({
+      error: { status, message: "sensitive provider error" },
+    });
+    const response = await callback(callbackRequest());
+    expect(response.headers.get("location")).toBe(origin + "/auth-error");
+    expect(mocks.getUser).not.toHaveBeenCalled();
+    expect(mocks.lookup).not.toHaveBeenCalled();
+    expect(JSON.stringify(log.mock.calls)).not.toContain("sensitive");
+    log.mockRestore();
+  },
+);
 it("rejects untrusted callback destinations and ignores supplied return paths", async () => {
   expect(
     (
