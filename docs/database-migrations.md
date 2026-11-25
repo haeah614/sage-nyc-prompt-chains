@@ -51,3 +51,156 @@ Prefer forward repair with handlers disabled once records exist. Keep schema and
 - On a failed reorder/update RPC, PostgreSQL should roll back both intermediate positions and all revision increments. That guarantee must be verified in the isolated concurrency tests before enabling edits.
 
 See [architecture](database-architecture.md) and the [deferred database verification matrix](database-verification.md).
+
+## Shared `sage-nyc-admin` migration review — 2026-11-25
+
+**Prepared, not applied. User approval is required before any shared-database
+change.** The user's current request authorizes inspection and preparation for
+this shared target, superseding the earlier isolated-project-only scope above.
+It does not authorize applying the proposal yet.
+
+Target: `maqhbfhrzluqznzrpisb` (`sage-nyc-admin`, `us-west-2`).
+Source: `iakvzlgxtucbcrgieacj` (`sage-nyc-admin-week7-test`, paused).
+`funnystudy-iteration-3` is excluded from every operation. No plan upgrade,
+project pause, source deletion, credential rotation, or Auth configuration change
+is part of this proposal.
+
+### Read-only findings
+
+- Target is `ACTIVE_HEALTHY`; `pg_database_size(current_database())` returned
+  **13,003,923 bytes** (13.004 decimal MB / 12.401 MiB).
+- Against the documented Free allowance of 500 MB, a conservative decimal
+  500,000,000-byte calculation leaves **486,996,077 bytes** (~487 MB), 97.4%.
+  This is a point-in-time database measurement, including indexes and catalogs;
+  it is not an egress or Storage-object usage measurement. Other apps share it.
+- All required public Week 7 tables exist. The four configuration tables have
+  their 12 enabled stamp/lock/check triggers. Existing routines are owned by
+  `postgres`. The chain/model/provider tables are currently empty.
+- `prompt_tool` and public `pct_*` RPCs are absent. There are two existing
+  Superadmin profiles; no names, user tokens, or flags were exported or changed.
+- The target lacks `protect_sage_superadmin_flag`, but effective INSERT/UPDATE
+  privileges on that column are false for ordinary authenticated users; anon
+  also lacks table UPDATE. The profile table is RLS-enabled and only postgres
+  and service_role have table grants. Existing auth provisioning inserts names
+  and leaves the Superadmin flag at its false default. The inspected public
+  SECURITY DEFINER routines do not expose flag updates.
+- Google is enabled and nonce validation enabled. The shared project's Google
+  client ID differs from Prompt Studio's local Google client ID. Target Auth
+  settings must remain unchanged; Prompt Studio must use an already accepted
+  shared client, with its own origins registered in that Google Web client.
+- Source project DNS is unavailable while paused. Its Management API backup
+  listing returned zero backups and empty physical-backup metadata. This is
+  **not evidence that its data is empty or lost**. Source row counts, catalog,
+  prompt definitions, and run history cannot yet be verified or imported.
+
+References: [Free database allowance](https://supabase.com/docs/guides/platform/billing-on-supabase),
+[database versus disk usage](https://supabase.com/docs/guides/platform/database-size).
+
+### Approval scope A: additive schema installation only
+
+Review `supabase/proposals/shared-admin/001_prompt_studio.sql` (standalone,
+transactional, not wired into any automatic migration runner). It assembles the
+existing Week 8 foundation and all 18 application RPCs, including the existing
+explicitly confirmed history/chain-delete capabilities. Installing those RPCs
+executes no deletions.
+
+Changes are limited to:
+
+1. Create private `prompt_tool` schema, five empty tables, indexes and helpers.
+2. Create 18 guarded public RPCs with EXECUTE only for `authenticated`; every RPC
+   checks signed Google identity and the existing true Superadmin flag. Private
+   tables remain RLS-enabled without browser grants or policies.
+3. Add `pct_step_parent_revision` to the existing step table. Future step edits
+   invalidate parent revisions, so an already-open Admin mix form may require a
+   reload. The trigger does not alter mix weights or existing chain records at
+   installation time.
+
+The target-specific prerequisite checks existing flag privileges instead of
+requiring an absent trigger. It does not add a profile trigger, grant access,
+change a policy, alter Auth provisioning, or change an existing role flag.
+Hashes of the eight inspected public function definitions guard against drift.
+Object collisions abort rather than overwrite. Recheck table/column/constraint,
+ACL, trigger and role-membership drift immediately before executing.
+
+The proposal uses one READ COMMITTED transaction, a five-second lock timeout,
+and a 30-second statement timeout. Initial and final checks abort at **50 MB
+for the entire database**, intentionally far below the 500 MB Free allowance.
+This bounds the approved empty-schema installation. No import or model seeds
+are included. SQL identity cannot safely infer a hosted project reference:
+the operator must verify the exact target through the Management API before
+submitting anything.
+
+Before application, take a recoverable target backup using an approved secure
+local destination and verify restoreability. Do not commit database data,
+credentials, or tokens. The old runbook remains relevant for locking,
+concurrency, and negative authorization tests.
+
+### Source preservation and cutover gates — not yet ready for approval
+
+Do not present an empty target as a completed migration. Obtain a downloadable
+backup/export of the paused source through its dashboard or Supabase support,
+without pausing either active project or upgrading. If it is unavailable,
+retain the source unchanged and stop before cutover; no data-loss waiver is
+implied by schema approval.
+
+After a source export is available:
+
+1. Restore it into an isolated **local** PostgreSQL environment. Inspect actual
+   schema, data sizes/counts, dependencies and source-only schema changes; the
+   repository proposals are not proof of the source's live schema.
+2. Prepare a separate reviewed data-only import for providers, models, chains,
+   steps, `step_options`, provider allowlist, runs, run steps and artifacts.
+   Preserve UUIDs, snapshots, revisions, timestamps and output text. Detect
+   collisions and stop; do not use blanket ON CONFLICT overwrites.
+3. Map actor references using verified identities, never blindly copy Auth UUIDs
+   across projects. Do not import auth.users, identities, sessions, passwords,
+   profiles or role flags into the shared project. Missing mappings and optional
+   provenance links require explicit review; do not silently discard attribution
+   or set links to NULL. Check any source Storage objects separately.
+4. Existing stamp and parent-revision triggers would rewrite imported metadata.
+   Design and rehearse an import-specific preservation procedure locally before
+   requesting import approval. Never disable shared triggers opportunistically
+   or replay a whole source database dump into the target.
+5. Measure restored source relation/index sizes and the rehearsed target delta.
+   Require target + import + indexes + conservative overhead to stay below
+   **50 MB** for this initial migration; revise the estimate and request renewed
+   review if not. Recheck live target size immediately before and after import.
+6. Review the complete import SQL and row-count/content-checksum reconciliation
+   before requesting separate approval. Preserve the source until reconciliation
+   and the user's acceptance are complete.
+7. Only then update **Prompt Studio's** Vercel Supabase URL/public key/server key
+   to the target project's matching values, and Google client ID to the shared
+   provider's existing client. Retain Gemini credentials and exact origin/CSRF
+   controls. Never change the Consumer or Admin deployments or environment files.
+8. Register Prompt Studio's stable origin and `/auth/callback` in that Google
+   client's authorized JavaScript origins and redirect URIs, preserving all
+   existing entries. Register a new commit URL too if it will be used for login.
+   Supabase Site URL/redirect allowlists are not the redirect path for this app's
+   GIS `signInWithIdToken` flow and need no speculative changes.
+9. Deploy Prompt Studio, verify approved Superadmin access and ordinary-user
+   denial, create/configure a chain, execute real Gemini steps, verify outputs
+   and persistent history, then smoke-test the existing Consumer/Admin flows.
+   Record a video only after all checks pass.
+
+No paid plan is needed for the measured empty-schema installation. Future
+unbounded run history can still fill any finite quota: one step can retain its
+input plus output plus a duplicate output artifact (up to roughly 0.75 MiB,
+plus snapshots/indexes); 100 large steps can exceed 75 MiB per run. Measure total
+DB and `prompt_tool` relation sizes before/after walkthrough runs. Review at
+350 MB and suspend new Prompt Studio runs operationally at 400 MB, leaving
+headroom for the other apps; this is an operational threshold, not an installed
+hard quota. Never auto-purge history to meet the limit. Any retention or runtime
+admission-control change needs a separate review. The Free plan must stay Free.
+
+### Verification and rollback status
+
+Prepared SQL is grammar-checked with PostgreSQL and PL/pgSQL parsers and tested
+for no top-level data writes, no replacement of existing public functions,
+profile-grant checks, scoped RPC guards, and capacity gates. This is **not** a
+live migration rehearsal. Local Docker was unavailable during preparation.
+
+If installation fails, its transaction rolls back. After installation, prefer
+forward repair and leave data intact; do not drop the schema after it has data.
+Before any cutover, the existing app remains on its original backend. After
+cutover, reverting environment variables alone does not merge new records back
+into the paused source; freeze writes and reconcile before any rollback.
